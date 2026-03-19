@@ -1,9 +1,9 @@
-  <!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="de">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Zeit-Depot Pro v13</title>
+    <title>Zeit-Depot Pro v15</title>
     <style>
         :root {
             --primary: #6c5ce7; --secondary: #a29bfe; --bg: #f0f2f8;
@@ -17,11 +17,13 @@
         .stat-card { background: var(--white); padding: 12px; border-radius: 15px; text-align: center; box-shadow: 0 5px 15px rgba(0,0,0,0.05); }
         .stat-card span { display: block; font-size: 9px; color: #b2bec3; text-transform: uppercase; }
         .stat-card strong { font-size: 18px; color: var(--primary); }
+        
         .comp-box { margin: 15px; padding: 15px; background: #f8f9fa; border-radius: 15px; border: 1px solid #eee; }
         .comp-row { display: flex; justify-content: space-between; font-size: 13px; margin-bottom: 5px; }
         .val-real { color: #e67e22; font-weight: bold; }
         .val-free { color: var(--plus); font-weight: bold; }
-        .loss-text { font-size: 11px; color: var(--minus); text-align: center; margin-top: 5px; font-style: italic; }
+        .loss-text { font-size: 11px; color: var(--minus); text-align: center; margin-top: 5px; font-style: italic; border-top: 1px dashed #ddd; padding-top: 5px; }
+
         .input-section { padding: 15px; border-bottom: 1px solid #eee; }
         .type-toggle { display: flex; gap: 8px; margin-bottom: 12px; }
         .type-btn { flex: 1; padding: 12px; border: none; border-radius: 10px; font-weight: bold; cursor: pointer; opacity: 0.3; transition: 0.3s; }
@@ -30,12 +32,12 @@
         .fields-row { display: flex; gap: 10px; width: 100%; margin-bottom: 8px; }
         .fields-row input { flex: 1; margin-bottom: 0; min-width: 0; }
         .btn-save { width: 100%; padding: 15px; background: var(--primary); color: white; border: none; border-radius: 12px; font-weight: bold; cursor: pointer; box-shadow: 0 5px 10px rgba(108, 92, 231, 0.2); }
+        
         .list { max-height: 200px; overflow-y: auto; padding: 15px; }
         .item { display: flex; justify-content: space-between; padding: 10px; background: #f9fbfd; border-radius: 10px; margin-bottom: 8px; border-left: 4px solid #ddd; }
         .item.plus { border-left-color: var(--plus); }
         .item.minus { border-left-color: var(--minus); }
         
-        /* Optimierte Lohn-Historie */
         .wage-config { padding: 15px; background: #fffcf0; border-top: 2px solid var(--warn); margin-bottom: 10px; }
         .wage-inputs { display: flex; flex-direction: column; gap: 5px; margin-bottom: 10px; }
         .wage-row-top { display: flex; gap: 8px; }
@@ -57,9 +59,10 @@
     </div>
 
     <div class="comp-box">
-        <div class="comp-row"><span>Auszahlung (ca. 9€ Netto):</span><span id="resReal" class="val-real">0,00 €</span></div>
+        <div class="comp-row"><span>Auszahlung (Netto-Wert):</span><span id="resReal" class="val-real">0,00 €</span></div>
         <div class="comp-row"><span>Wert als Freizeit (Netto):</span><span id="resFree" class="val-free">0,00 €</span></div>
         <div id="resLoss" class="loss-text">Steuer-Verlust bei Auszahlung: 0,00 €</div>
+        <div id="progressionHint" style="font-size: 9px; color: #999; text-align: center; margin-top: 5px;">Berechnet mit dynamischer Steuerprogression</div>
     </div>
 
     <div class="input-section">
@@ -97,8 +100,8 @@
 </div>
 
 <script>
-    let data = JSON.parse(localStorage.getItem('depot_v13_data')) || [];
-    let wages = JSON.parse(localStorage.getItem('depot_v13_wages')) || [];
+    let data = JSON.parse(localStorage.getItem('depot_v15_data')) || [];
+    let wages = JSON.parse(localStorage.getItem('depot_v15_wages')) || [];
     let currentType = 'plus';
 
     function setType(t) {
@@ -114,11 +117,9 @@
         if(d && w) {
             wages.push({date: d, wage: w});
             wages.sort((a,b) => new Date(a.date) - new Date(b.date));
-            localStorage.setItem('depot_v13_wages', JSON.stringify(wages));
+            localStorage.setItem('depot_v15_wages', JSON.stringify(wages));
             updateUI();
             document.getElementById('wageVal').value = '';
-        } else {
-            alert("Bitte Datum und Bruttolohn eingeben!");
         }
     }
 
@@ -131,6 +132,15 @@
         return activeWage;
     }
 
+    // Die dynamische Progression: Weniger Netto bei mehr Stunden
+    function calculateDynamicNetto(brutto, totalHours) {
+        let nettoFaktor = 0.62; // Basis-Start (ca. Steuerklasse 1)
+        // Pro 30 Überstunden sinkt das Netto um ca. 1% (Progression)
+        let progressionsAbzug = Math.floor(totalHours / 30) * 0.01;
+        let finalFaktor = Math.max(0.48, nettoFaktor - progressionsAbzug); 
+        return brutto * finalFaktor;
+    }
+
     function updateUI() {
         const list = document.getElementById('entryList');
         const wList = document.getElementById('wageList');
@@ -138,15 +148,22 @@
         
         list.innerHTML = '';
         data.sort((a,b) => new Date(b.date) - new Date(a.date));
+
+        data.forEach(e => {
+            totalH += (e.type === 'plus' ? parseFloat(e.hours) : -parseFloat(e.hours));
+        });
         
         data.forEach((e, i) => {
             const wage = getWageForDate(e.date);
             const isPlus = e.type === 'plus';
             const hours = parseFloat(e.hours);
             
-            totalH += isPlus ? hours : -hours;
-            totalReal += (isPlus ? hours : -hours) * 9.00; 
+            // Wert als Freizeit (ca. 70% vom Brutto als "echter" Nutzwert)
             totalFree += (isPlus ? hours : -hours) * (wage * 0.7); 
+            
+            // Auszahlungswert basierend auf der Progression
+            const dynNetto = calculateDynamicNetto(wage, totalH);
+            totalReal += (isPlus ? hours : -hours) * dynNetto;
 
             list.innerHTML += `<div class="item ${e.type}">
                 <div style="font-size:12px"><b>${new Date(e.date).toLocaleDateString('de-DE')}</b><br><span style="color:#999">${e.note || ''}</span></div>
@@ -162,50 +179,28 @@
         document.getElementById('totalD').innerText = (totalH / 8).toFixed(1);
         document.getElementById('resReal').innerText = totalReal.toFixed(2).replace('.', ',') + " €";
         document.getElementById('resFree').innerText = totalFree.toFixed(2).replace('.', ',') + " €";
-        document.getElementById('resLoss').innerText = "Verlust bei Auszahlung: -" + (totalFree - totalReal).toFixed(2).replace('.', ',') + " €";
+        document.getElementById('resLoss').innerText = "Steuer-Verlust bei Auszahlung: -" + Math.abs(totalFree - totalReal).toFixed(2).replace('.', ',') + " €";
 
         if (wages.length > 0) {
-            wList.innerHTML = "<b>Verlauf:</b> " + wages.map(w => `${new Date(w.date).toLocaleDateString('de-DE', {month:'short', year:'2-digit'})}: ${w.wage.toFixed(2)}€`).join(' | ');
-        } else {
-            wList.innerHTML = "Noch kein Lohn hinterlegt.";
+            wList.innerHTML = "<b>Lohn-Verlauf:</b> " + wages.map(w => `${new Date(w.date).toLocaleDateString('de-DE', {month:'short', year:'2-digit'})}: ${w.wage.toFixed(2)}€`).join(' | ');
         }
         
-        localStorage.setItem('depot_v13_data', JSON.stringify(data));
+        localStorage.setItem('depot_v15_data', JSON.stringify(data));
     }
 
     function addEntry() {
-        if (wages.length === 0) {
-            alert("Bitte lege zuerst unten einen Lohn fest!");
-            return;
-        }
-        const d = document.getElementById('dateIn').value;
-        const hInput = document.getElementById('hourIn').value;
-        const dInput = document.getElementById('dayIn').value;
-        const n = document.getElementById('noteIn').value;
-
-        let finalHours = 0;
-        if(hInput) finalHours += parseFloat(hInput);
-        if(dInput) finalHours += parseFloat(dInput) * 8; 
-
-        if(d && finalHours > 0) {
-            data.push({date: d, hours: finalHours, type: currentType, note: n});
-            document.getElementById('hourIn').value = ''; 
-            document.getElementById('dayIn').value = ''; 
-            document.getElementById('noteIn').value = '';
+        if (wages.length === 0) { alert("Bitte erst Lohn setzen!"); return; }
+        const d = document.getElementById('dateIn').value, h = document.getElementById('hourIn').value, di = document.getElementById('dayIn').value, n = document.getElementById('noteIn').value;
+        let fH = (h ? parseFloat(h) : 0) + (di ? parseFloat(di) * 8 : 0);
+        if(d && fH > 0) {
+            data.push({date: d, hours: fH, type: currentType, note: n});
+            document.getElementById('hourIn').value = ''; document.getElementById('dayIn').value = ''; document.getElementById('noteIn').value = '';
             updateUI();
-        } else {
-            alert("Bitte Datum und Stunden/Tage eingeben!");
         }
     }
 
-    function delEntry(i) { if(confirm("Löschen?")) { data.splice(i, 1); updateUI(); } }
-
-    function deleteAllData() {
-        if(confirm("ACHTUNG: Willst du wirklich ALLE Daten löschen?")) {
-            localStorage.clear();
-            location.reload(); 
-        }
-    }
+    function delEntry(i) { if(confirm("Eintrag löschen?")) { data.splice(i, 1); updateUI(); } }
+    function deleteAllData() { if(confirm("Wirklich ALLES löschen?")) { localStorage.clear(); location.reload(); } }
 
     document.getElementById('dateIn').valueAsDate = new Date();
     document.getElementById('wageDate').valueAsDate = new Date();
@@ -213,4 +208,3 @@
 </script>
 </body>
 </html>
-
