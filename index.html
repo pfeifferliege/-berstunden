@@ -1,44 +1,49 @@
-<!DOCTYPE html>
+  <!DOCTYPE html>
 <html lang="de">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Zeit-Depot Pro v8</title>
+    <title>Zeit-Depot Pro v13</title>
     <style>
         :root {
             --primary: #6c5ce7; --secondary: #a29bfe; --bg: #f0f2f8;
-            --plus: #00b894; --minus: #e17055; --white: #ffffff; --warn: #fdcb6e;
+            --plus: #00b894; --minus: #e17055; --white: #ffffff; --warn: #fdcb6e; --danger: #d63031;
         }
         body { font-family: 'Segoe UI', sans-serif; background: var(--bg); margin: 0; padding: 10px; display: flex; justify-content: center; }
-        .app-container { width: 100%; max-width: 420px; background: var(--white); border-radius: 30px; box-shadow: 0 15px 35px rgba(0,0,0,0.1); overflow: hidden; }
+        .app-container { width: 100%; max-width: 420px; background: var(--white); border-radius: 30px; box-shadow: 0 15px 35px rgba(0,0,0,0.1); overflow: hidden; padding-bottom: 20px; }
         .header { background: linear-gradient(135deg, var(--primary), var(--secondary)); padding: 25px 15px; color: white; text-align: center; }
         .header h1 { margin: 0; font-size: 22px; text-transform: uppercase; letter-spacing: 1px; }
-        
         .dashboard { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; padding: 0 15px; margin-top: -20px; }
         .stat-card { background: var(--white); padding: 12px; border-radius: 15px; text-align: center; box-shadow: 0 5px 15px rgba(0,0,0,0.05); }
         .stat-card span { display: block; font-size: 9px; color: #b2bec3; text-transform: uppercase; }
         .stat-card strong { font-size: 18px; color: var(--primary); }
-        
         .comp-box { margin: 15px; padding: 15px; background: #f8f9fa; border-radius: 15px; border: 1px solid #eee; }
         .comp-row { display: flex; justify-content: space-between; font-size: 13px; margin-bottom: 5px; }
         .val-real { color: #e67e22; font-weight: bold; }
         .val-free { color: var(--plus); font-weight: bold; }
         .loss-text { font-size: 11px; color: var(--minus); text-align: center; margin-top: 5px; font-style: italic; }
-
         .input-section { padding: 15px; border-bottom: 1px solid #eee; }
         .type-toggle { display: flex; gap: 8px; margin-bottom: 12px; }
-        .type-btn { flex: 1; padding: 10px; border: none; border-radius: 10px; font-weight: bold; cursor: pointer; opacity: 0.3; transition: 0.3s; }
+        .type-btn { flex: 1; padding: 12px; border: none; border-radius: 10px; font-weight: bold; cursor: pointer; opacity: 0.3; transition: 0.3s; }
         .type-btn.active { opacity: 1; transform: scale(1.02); }
-        input { width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 8px; margin-bottom: 8px; box-sizing: border-box; font-size: 15px; background: #fdfdfd; }
+        input { width: 100%; padding: 12px; border: 1px solid #ddd; border-radius: 8px; margin-bottom: 8px; box-sizing: border-box; font-size: 15px; background: #fdfdfd; }
+        .fields-row { display: flex; gap: 10px; width: 100%; margin-bottom: 8px; }
+        .fields-row input { flex: 1; margin-bottom: 0; min-width: 0; }
         .btn-save { width: 100%; padding: 15px; background: var(--primary); color: white; border: none; border-radius: 12px; font-weight: bold; cursor: pointer; box-shadow: 0 5px 10px rgba(108, 92, 231, 0.2); }
-
         .list { max-height: 200px; overflow-y: auto; padding: 15px; }
-        .item { display: flex; justify-content: space-between; padding: 10px; background: #f9fbfd; border-radius: 10px; margin-bottom: 8px; border-left: 4px solid #ddd; transition: 0.2s; }
+        .item { display: flex; justify-content: space-between; padding: 10px; background: #f9fbfd; border-radius: 10px; margin-bottom: 8px; border-left: 4px solid #ddd; }
         .item.plus { border-left-color: var(--plus); }
         .item.minus { border-left-color: var(--minus); }
         
-        .wage-config { padding: 15px; background: #fffcf0; border-top: 2px solid var(--warn); }
-        .del-btn { border: none; background: none; color: #ff7675; font-size: 18px; cursor: pointer; margin-left: 10px; vertical-align: middle; }
+        /* Optimierte Lohn-Historie */
+        .wage-config { padding: 15px; background: #fffcf0; border-top: 2px solid var(--warn); margin-bottom: 10px; }
+        .wage-inputs { display: flex; flex-direction: column; gap: 5px; margin-bottom: 10px; }
+        .wage-row-top { display: flex; gap: 8px; }
+        .wage-row-top input { margin-bottom: 0; }
+        .btn-wage-set { width: 100%; padding: 10px; background: var(--warn); border: none; border-radius: 8px; font-weight: bold; cursor: pointer; margin-top: 5px; }
+        
+        .btn-delete-all { width: calc(100% - 30px); margin: 0 15px; padding: 12px; background: var(--danger); color: white; border: none; border-radius: 12px; font-weight: bold; cursor: pointer; font-size: 12px; }
+        .del-btn { border: none; background: none; color: #ff7675; font-size: 18px; cursor: pointer; margin-left: 10px; }
     </style>
 </head>
 <body>
@@ -60,38 +65,47 @@
     <div class="input-section">
         <div class="type-toggle">
             <button id="btnPlus" class="type-btn active" style="background:var(--plus);color:white" onclick="setType('plus')">+ Überstunden</button>
-            <button id="btnMinus" class="type-btn" style="background:var(--minus);color:white" onclick="setType('minus')">- Abgefeiert</button>
+            <button id="btnMinus" class="type-btn" style="background:var(--minus);color:white" onclick="setType('minus')">- Überstunden</button>
         </div>
+        
         <input type="date" id="dateIn">
-        <input type="number" id="hourIn" placeholder="Anzahl Stunden" step="0.5" inputmode="decimal">
-        <input type="text" id="noteIn" placeholder="Notiz (z.B. Monat oder Grund)">
+        
+        <div class="fields-row">
+            <input type="number" id="hourIn" placeholder="Stdn" step="0.5" inputmode="decimal">
+            <input type="number" id="dayIn" placeholder="Tage" step="0.5" inputmode="decimal" style="display:none">
+        </div>
+
+        <input type="text" id="noteIn" placeholder="Notiz (optional)">
         <button class="btn-save" onclick="addEntry()">Speichern & Leeren</button>
     </div>
 
     <div id="entryList" class="list"></div>
 
     <div class="wage-config">
-        <h4 style="margin:0 0 10px 0; font-size:14px">Lohn-Historie (Ab Jan 2026)</h4>
-        <div style="display:flex; gap:5px; margin-bottom:10px">
-            <input type="date" id="wageDate" style="font-size:12px; margin:0">
-            <input type="number" id="wageVal" placeholder="Brutto €" style="margin:0">
-            <button onclick="addWage()" style="background:var(--warn); border:none; padding:5px 10px; border-radius:8px; font-weight:bold; cursor:pointer">Setzen</button>
+        <h4 style="margin:0 0 10px 0; font-size:14px">Lohn-Historie verwalten</h4>
+        <div class="wage-inputs">
+            <div class="wage-row-top">
+                <input type="date" id="wageDate" style="flex: 1.5;">
+                <input type="number" id="wageVal" placeholder="Lohn €" step="0.01" style="flex: 1;">
+            </div>
+            <button onclick="addWage()" class="btn-wage-set">Neuen Lohn ab Datum setzen</button>
         </div>
-        <div id="wageList" style="font-size:10px; color:#636e72; line-height:1.4"></div>
+        <div id="wageList" style="font-size:10px; color:#636e72; line-height: 1.4;">Noch kein Lohn hinterlegt.</div>
     </div>
+
+    <button class="btn-delete-all" onclick="deleteAllData()">⚠ KOMPLETTES DEPOT LÖSCHEN</button>
 </div>
 
 <script>
-    // Daten laden (v8 nutzt neuen Speicher-Key um Konflikte zu vermeiden)
-    let data = JSON.parse(localStorage.getItem('depot_v8_data')) || [];
-    // Start-Lohn auf Januar 2026 gesetzt
-    let wages = JSON.parse(localStorage.getItem('depot_v8_wages')) || [{date: '2026-01-01', wage: 14.00}];
+    let data = JSON.parse(localStorage.getItem('depot_v13_data')) || [];
+    let wages = JSON.parse(localStorage.getItem('depot_v13_wages')) || [];
     let currentType = 'plus';
 
     function setType(t) {
         currentType = t;
         document.getElementById('btnPlus').classList.toggle('active', t === 'plus');
         document.getElementById('btnMinus').classList.toggle('active', t === 'minus');
+        document.getElementById('dayIn').style.display = (t === 'minus') ? 'block' : 'none';
     }
 
     function addWage() {
@@ -100,18 +114,19 @@
         if(d && w) {
             wages.push({date: d, wage: w});
             wages.sort((a,b) => new Date(a.date) - new Date(b.date));
-            localStorage.setItem('depot_v8_wages', JSON.stringify(wages));
+            localStorage.setItem('depot_v13_wages', JSON.stringify(wages));
             updateUI();
+            document.getElementById('wageVal').value = '';
+        } else {
+            alert("Bitte Datum und Bruttolohn eingeben!");
         }
     }
 
     function getWageForDate(targetDate) {
+        if (wages.length === 0) return 0;
         let activeWage = wages[0].wage;
-        // Da die Liste sortiert ist, finden wir den letzten gültigen Lohn vor/am Datum
         for(let w of wages) {
-            if(new Date(targetDate) >= new Date(w.date)) {
-                activeWage = w.wage;
-            }
+            if(new Date(targetDate) >= new Date(w.date)) activeWage = w.wage;
         }
         return activeWage;
     }
@@ -134,13 +149,10 @@
             totalFree += (isPlus ? hours : -hours) * (wage * 0.7); 
 
             list.innerHTML += `<div class="item ${e.type}">
-                <div style="font-size:12px">
-                    <b>${new Date(e.date).toLocaleDateString('de-DE')}</b><br>
-                    <span style="color:#999">${e.note || ''}</span>
-                </div>
+                <div style="font-size:12px"><b>${new Date(e.date).toLocaleDateString('de-DE')}</b><br><span style="color:#999">${e.note || ''}</span></div>
                 <div style="text-align:right">
                     <span style="font-weight:bold; color:${isPlus?'var(--plus)':'var(--minus)'}">${isPlus?'+':'-'}${hours.toFixed(1)}h</span><br>
-                    <small style="color:#b2bec3">${wage.toFixed(2)}€/h</small>
+                    <small style="color:#b2bec3">${wage > 0 ? wage.toFixed(2) + '€/h' : '?? €'}</small>
                     <button onclick="delEntry(${i})" class="del-btn">×</button>
                 </div>
             </div>`;
@@ -150,43 +162,55 @@
         document.getElementById('totalD').innerText = (totalH / 8).toFixed(1);
         document.getElementById('resReal').innerText = totalReal.toFixed(2).replace('.', ',') + " €";
         document.getElementById('resFree').innerText = totalFree.toFixed(2).replace('.', ',') + " €";
-        document.getElementById('resLoss').innerText = "Steuer-Verlust bei Auszahlung: -" + (totalFree - totalReal).toFixed(2).replace('.', ',') + " €";
+        document.getElementById('resLoss').innerText = "Verlust bei Auszahlung: -" + (totalFree - totalReal).toFixed(2).replace('.', ',') + " €";
 
-        wList.innerHTML = "<b>Lohn-Verlauf:</b><br>" + wages.map(w => {
-            const d = new Date(w.date).toLocaleDateString('de-DE', {month:'short', year:'numeric'});
-            return `${d}: ${w.wage.toFixed(2)} €`;
-        }).join(' | ');
+        if (wages.length > 0) {
+            wList.innerHTML = "<b>Verlauf:</b> " + wages.map(w => `${new Date(w.date).toLocaleDateString('de-DE', {month:'short', year:'2-digit'})}: ${w.wage.toFixed(2)}€`).join(' | ');
+        } else {
+            wList.innerHTML = "Noch kein Lohn hinterlegt.";
+        }
         
-        localStorage.setItem('depot_v8_data', JSON.stringify(data));
+        localStorage.setItem('depot_v13_data', JSON.stringify(data));
     }
 
     function addEntry() {
+        if (wages.length === 0) {
+            alert("Bitte lege zuerst unten einen Lohn fest!");
+            return;
+        }
         const d = document.getElementById('dateIn').value;
-        const h = document.getElementById('hourIn').value;
+        const hInput = document.getElementById('hourIn').value;
+        const dInput = document.getElementById('dayIn').value;
         const n = document.getElementById('noteIn').value;
-        if(d && h) {
-            data.push({date: d, hours: h, type: currentType, note: n});
-            // AUTOMATISCHER RESET DER FELDER
+
+        let finalHours = 0;
+        if(hInput) finalHours += parseFloat(hInput);
+        if(dInput) finalHours += parseFloat(dInput) * 8; 
+
+        if(d && finalHours > 0) {
+            data.push({date: d, hours: finalHours, type: currentType, note: n});
             document.getElementById('hourIn').value = ''; 
+            document.getElementById('dayIn').value = ''; 
             document.getElementById('noteIn').value = '';
             updateUI();
         } else {
-            alert("Bitte Datum und Stunden eingeben!");
+            alert("Bitte Datum und Stunden/Tage eingeben!");
         }
     }
 
-    function delEntry(i) {
-        if(confirm("Diesen Eintrag wirklich löschen?")) {
-            data.splice(i, 1);
-            updateUI();
+    function delEntry(i) { if(confirm("Löschen?")) { data.splice(i, 1); updateUI(); } }
+
+    function deleteAllData() {
+        if(confirm("ACHTUNG: Willst du wirklich ALLE Daten löschen?")) {
+            localStorage.clear();
+            location.reload(); 
         }
     }
 
-    // Initialisierung
     document.getElementById('dateIn').valueAsDate = new Date();
     document.getElementById('wageDate').valueAsDate = new Date();
     updateUI();
 </script>
-
 </body>
 </html>
+
