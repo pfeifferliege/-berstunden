@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Zeit-Depot Pro</title>
+    <title>Zeit-Depot Pro v18</title>
     <style>
         :root {
             --primary: #6c5ce7; --secondary: #a29bfe; --bg: #f0f2f8;
@@ -22,7 +22,8 @@
         .comp-row { display: flex; justify-content: space-between; font-size: 13px; margin-bottom: 5px; align-items: center; }
         .val-real { color: #e67e22; font-weight: bold; }
         .val-free { color: var(--plus); font-weight: bold; }
-        .loss-text { font-size: 11px; color: var(--minus); text-align: center; margin-top: 5px; font-style: italic; border-top: 1px dashed #ddd; padding-top: 5px; }
+        .loss-text { font-size: 11px; color: #636e72; text-align: center; margin-top: 8px; border-top: 1px dashed #ddd; padding-top: 8px; transition: 0.3s; }
+        .loss-active { color: var(--danger) !important; font-weight: 900 !important; transform: scale(1.05); }
 
         .input-section { padding: 15px; border-bottom: 1px solid #eee; }
         .type-toggle { display: flex; gap: 8px; margin-bottom: 12px; }
@@ -60,7 +61,7 @@
 
     <div class="comp-box">
         <div class="comp-row">
-            <span style="font-size: 11px;">Auszahlung <br><small id="wageDisplay" style="color:#636e72;">[0,00 / 0,00] Netto h</small></span>
+            <span style="font-size: 11px; line-height: 1.2;">Auszahlung <br><small id="wageDisplay" style="color:#6c5ce7; font-weight: bold;">[0,00 / 0,00] Netto h</small></span>
             <span id="resReal" class="val-real">0,00 €</span>
         </div>
         <div class="comp-row" style="margin-top: 10px;">
@@ -105,8 +106,8 @@
 </div>
 
 <script>
-    let data = JSON.parse(localStorage.getItem('depot_v16_data')) || [];
-    let wages = JSON.parse(localStorage.getItem('depot_v16_wages')) || [];
+    let data = JSON.parse(localStorage.getItem('depot_v18_data')) || [];
+    let wages = JSON.parse(localStorage.getItem('depot_v18_wages')) || [];
     let currentType = 'plus';
 
     function setType(t) {
@@ -121,7 +122,7 @@
         if(d && w) {
             wages.push({date: d, wage: w});
             wages.sort((a,b) => new Date(a.date) - new Date(b.date));
-            localStorage.setItem('depot_v16_wages', JSON.stringify(wages));
+            localStorage.setItem('depot_v18_wages', JSON.stringify(wages));
             updateUI();
             document.getElementById('wageVal').value = '';
         }
@@ -155,9 +156,8 @@
             totalH += (e.type === 'plus' ? parseFloat(e.hours) : -parseFloat(e.hours));
         });
         
-        // Aktuellen Lohn für die Info-Anzeige holen
         const latestWage = wages.length > 0 ? wages[wages.length-1].wage : 0;
-        const regNetto = latestWage * 0.70; // Regulär 70% Netto-Annahme
+        const regNetto = latestWage * 0.70; 
         const dynNettoProStunde = calculateDynamicNetto(latestWage, totalH);
 
         data.forEach((e, i) => {
@@ -178,19 +178,29 @@
             </div>`;
         });
 
+        const lossAmount = Math.abs(totalFree - totalReal);
+
         document.getElementById('totalH').innerText = totalH.toFixed(1);
         document.getElementById('totalD').innerText = (totalH / 8).toFixed(1);
         document.getElementById('resReal').innerText = totalReal.toFixed(2).replace('.', ',') + " €";
         document.getElementById('resFree').innerText = totalFree.toFixed(2).replace('.', ',') + " €";
-        document.getElementById('resLoss').innerText = "Steuer-Verlust bei Auszahlung: -" + Math.abs(totalFree - totalReal).toFixed(2).replace('.', ',') + " €";
         
-        // Anzeige der Lohn-Ratio [Dyn / Reg]
+        const lossElement = document.getElementById('resLoss');
+        lossElement.innerText = "Lohnverlust bei Auszahlung: -" + lossAmount.toFixed(2).replace('.', ',') + " €";
+        
+        // Warnlogik: Ab 50 Euro Verlust wird es rot
+        if(lossAmount >= 50) {
+            lossElement.classList.add('loss-active');
+        } else {
+            lossElement.classList.remove('loss-active');
+        }
+        
         document.getElementById('wageDisplay').innerText = `[${dynNettoProStunde.toFixed(2)} / ${regNetto.toFixed(2)}] Netto h`;
 
         if (wages.length > 0) {
             wList.innerHTML = "<b>Lohn-Verlauf:</b> " + wages.map(w => `${new Date(w.date).toLocaleDateString('de-DE', {month:'short', year:'2-digit'})}: ${w.wage.toFixed(2)}€`).join(' | ');
         }
-        localStorage.setItem('depot_v16_data', JSON.stringify(data));
+        localStorage.setItem('depot_v18_data', JSON.stringify(data));
     }
 
     function addEntry() {
