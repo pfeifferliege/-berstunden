@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Zeit-Depot Pro v15</title>
+    <title>Zeit-Depot Pro v16</title>
     <style>
         :root {
             --primary: #6c5ce7; --secondary: #a29bfe; --bg: #f0f2f8;
@@ -19,7 +19,7 @@
         .stat-card strong { font-size: 18px; color: var(--primary); }
         
         .comp-box { margin: 15px; padding: 15px; background: #f8f9fa; border-radius: 15px; border: 1px solid #eee; }
-        .comp-row { display: flex; justify-content: space-between; font-size: 13px; margin-bottom: 5px; }
+        .comp-row { display: flex; justify-content: space-between; font-size: 13px; margin-bottom: 5px; align-items: center; }
         .val-real { color: #e67e22; font-weight: bold; }
         .val-free { color: var(--plus); font-weight: bold; }
         .loss-text { font-size: 11px; color: var(--minus); text-align: center; margin-top: 5px; font-style: italic; border-top: 1px dashed #ddd; padding-top: 5px; }
@@ -59,10 +59,15 @@
     </div>
 
     <div class="comp-box">
-        <div class="comp-row"><span>Auszahlung (Netto-Wert):</span><span id="resReal" class="val-real">0,00 €</span></div>
-        <div class="comp-row"><span>Wert als Freizeit (Netto):</span><span id="resFree" class="val-free">0,00 €</span></div>
+        <div class="comp-row">
+            <span style="font-size: 11px;">Auszahlung <br><small id="wageDisplay" style="color:#636e72;">[0,00 / 0,00] Netto h</small></span>
+            <span id="resReal" class="val-real">0,00 €</span>
+        </div>
+        <div class="comp-row" style="margin-top: 10px;">
+            <span>Wert als Freizeit (Netto):</span>
+            <span id="resFree" class="val-free">0,00 €</span>
+        </div>
         <div id="resLoss" class="loss-text">Steuer-Verlust bei Auszahlung: 0,00 €</div>
-        <div id="progressionHint" style="font-size: 9px; color: #999; text-align: center; margin-top: 5px;">Berechnet mit dynamischer Steuerprogression</div>
     </div>
 
     <div class="input-section">
@@ -100,8 +105,8 @@
 </div>
 
 <script>
-    let data = JSON.parse(localStorage.getItem('depot_v15_data')) || [];
-    let wages = JSON.parse(localStorage.getItem('depot_v15_wages')) || [];
+    let data = JSON.parse(localStorage.getItem('depot_v16_data')) || [];
+    let wages = JSON.parse(localStorage.getItem('depot_v16_wages')) || [];
     let currentType = 'plus';
 
     function setType(t) {
@@ -112,12 +117,11 @@
     }
 
     function addWage() {
-        const d = document.getElementById('wageDate').value;
-        const w = parseFloat(document.getElementById('wageVal').value);
+        const d = document.getElementById('wageDate').value, w = parseFloat(document.getElementById('wageVal').value);
         if(d && w) {
             wages.push({date: d, wage: w});
             wages.sort((a,b) => new Date(a.date) - new Date(b.date));
-            localStorage.setItem('depot_v15_wages', JSON.stringify(wages));
+            localStorage.setItem('depot_v16_wages', JSON.stringify(wages));
             updateUI();
             document.getElementById('wageVal').value = '';
         }
@@ -132,10 +136,8 @@
         return activeWage;
     }
 
-    // Die dynamische Progression: Weniger Netto bei mehr Stunden
     function calculateDynamicNetto(brutto, totalHours) {
-        let nettoFaktor = 0.62; // Basis-Start (ca. Steuerklasse 1)
-        // Pro 30 Überstunden sinkt das Netto um ca. 1% (Progression)
+        let nettoFaktor = 0.62; 
         let progressionsAbzug = Math.floor(totalHours / 30) * 0.01;
         let finalFaktor = Math.max(0.48, nettoFaktor - progressionsAbzug); 
         return brutto * finalFaktor;
@@ -153,15 +155,16 @@
             totalH += (e.type === 'plus' ? parseFloat(e.hours) : -parseFloat(e.hours));
         });
         
+        // Aktuellen Lohn für die Info-Anzeige holen
+        const latestWage = wages.length > 0 ? wages[wages.length-1].wage : 0;
+        const regNetto = latestWage * 0.70; // Regulär 70% Netto-Annahme
+        const dynNettoProStunde = calculateDynamicNetto(latestWage, totalH);
+
         data.forEach((e, i) => {
             const wage = getWageForDate(e.date);
             const isPlus = e.type === 'plus';
             const hours = parseFloat(e.hours);
-            
-            // Wert als Freizeit (ca. 70% vom Brutto als "echter" Nutzwert)
             totalFree += (isPlus ? hours : -hours) * (wage * 0.7); 
-            
-            // Auszahlungswert basierend auf der Progression
             const dynNetto = calculateDynamicNetto(wage, totalH);
             totalReal += (isPlus ? hours : -hours) * dynNetto;
 
@@ -180,12 +183,14 @@
         document.getElementById('resReal').innerText = totalReal.toFixed(2).replace('.', ',') + " €";
         document.getElementById('resFree').innerText = totalFree.toFixed(2).replace('.', ',') + " €";
         document.getElementById('resLoss').innerText = "Steuer-Verlust bei Auszahlung: -" + Math.abs(totalFree - totalReal).toFixed(2).replace('.', ',') + " €";
+        
+        // Anzeige der Lohn-Ratio [Dyn / Reg]
+        document.getElementById('wageDisplay').innerText = `[${dynNettoProStunde.toFixed(2)} / ${regNetto.toFixed(2)}] Netto h`;
 
         if (wages.length > 0) {
             wList.innerHTML = "<b>Lohn-Verlauf:</b> " + wages.map(w => `${new Date(w.date).toLocaleDateString('de-DE', {month:'short', year:'2-digit'})}: ${w.wage.toFixed(2)}€`).join(' | ');
         }
-        
-        localStorage.setItem('depot_v15_data', JSON.stringify(data));
+        localStorage.setItem('depot_v16_data', JSON.stringify(data));
     }
 
     function addEntry() {
